@@ -6,9 +6,41 @@ It will also look for any I4 json files in your mod and scan those for requested
 
 ## Usage
 
-For full help, run `mcm-meta-helper help`, or `mcm-meta-helper <command> help` for help with a specific command.
-
 The most common usage is to change your working directory to your mod directory, then run `mcm-meta-helper check`.
+
+```text
+$ mcm-meta-helper help
+Help manage MCM Helper translation files by checking for missing or unused translations.
+
+Can also compare your config.json file against the MCM Helper schema to report problems, though this is unreliable at the moment because the schema is not quite right.
+
+Usage: mcm-meta-helper [OPTIONS] <COMMAND>
+
+Commands:
+  check     Cross-check required translation strings versus the ones found
+            in translation files
+  update    Update the specified translation files with missing translation
+            strings and placeholders. NOT YET IMPLEMENTED
+  validate  Validate the mcm config json file against the MCM helper schema
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -m, --moddir <MODDIR>
+          The mod directory containing the mod to analyze
+          [default: .]
+
+  -v, --verbose Print out more information as the tool runs
+
+  -q, --quiet Print out only very important information
+
+  -h, --help Print help (see a summary with '-h')
+
+  -V, --version Print version
+  ```
+
+## Hacking
+
+This is a Rust language project. Install the Rust tools with [rustup](https://rustup.rs), then run `cargo build` to build.
 
 ## License
 
