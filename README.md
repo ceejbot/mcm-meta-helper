@@ -18,9 +18,9 @@ Usage: mcm-meta-helper [OPTIONS] <COMMAND>
 
 Commands:
   check     Cross-check required translation strings versus the ones found
-            in translation files
-  update    Update the specified translation files with missing translation
-            strings and placeholders. NOT YET IMPLEMENTED
+            in translation files.
+  update    Update all mod translation files with missing translation strings
+            and placeholders.
   validate  Validate the mcm config json file against the MCM helper schema
   help      Print this message or the help of the given subcommand(s)
 
@@ -28,15 +28,11 @@ Options:
   -m, --moddir <MODDIR>
           The mod directory containing the mod to analyze
           [default: .]
-
   -v, --verbose Print out more information as the tool runs
-
   -q, --quiet Print out only very important information
-
   -h, --help Print help (see a summary with '-h')
-
   -V, --version Print version
-  ```
+```
 
 ## Hacking
 

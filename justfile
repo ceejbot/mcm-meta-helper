@@ -60,3 +60,7 @@ archive:
 [windows]
 @archive:
 	write-host "You need to run this in WSL to get bash."
+
+# Check soulsyhud
+soulsy:
+	cargo run -- --moddir ../soulsy/installer/core check --language english -v

@@ -41,21 +41,35 @@ pub struct Args {
 pub enum Command {
     /// Cross-check required translation strings versus the ones found in translation files.
     Check {
-        /// Reference language to cross-check against.
-        #[clap(long, short, default_value = "English")]
-        language: String,
+        #[command(flatten)]
+        opts: Langs,
     },
-    /// Update the specified translation files with missing translation strings and placeholders. NOT YET IMPLEMENTED.
+    /// Update all translation files with missing translation strings and placeholders.
     Update,
     /// Validate the mcm config json file against the MCM helper schema
     Validate,
 }
 
+#[derive(Clone, Debug, clap::Args)]
+#[group(required = true, multiple = false)]
+pub struct Langs {
+    /// Check only translations for this one language.
+    #[arg(long, short)]
+    language: String,
+    /// Check all languages
+    #[arg(long)]
+    all: bool,
+}
+
 impl std::fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::Check { ref language } => {
-                write!(f, "check --language {language}")
+            Command::Check { opts } => {
+                if opts.all {
+                    write!(f, "check --all")
+                } else {
+                    write!(f, "check --language {}", opts.language)
+                }
             }
             Command::Update => write!(f, "update"),
             Command::Validate => write!(f, "validate"),
@@ -101,63 +115,89 @@ pub fn print_in_grid(items: &Vec<impl ToString>, level: log::Level) {
     }
 }
 
-fn check(args: &Args, language: &str) -> Result<(), Report> {
+fn check(args: &Args, check_all: bool, language: &str) -> Result<(), Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
-    log::info!("\nChecking strings in {}...", moddir.name().bold().blue());
-    let provided = moddir
-        .provided_translations_for(language)
-        .context(format!("Finding all translations into {language}"))?;
-    log::debug!(
-        "    {} {} translations found.",
-        provided.len(),
-        language.bold().blue()
-    );
     let requested = moddir
         .all_needed_translations()
         .context("Finding all requested translations")?;
-    log::debug!("    {} translations needed.", requested.len());
-
-    let provided_set: HashSet<String> = HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
     let requested_set: HashSet<String> =
         HashSet::from_iter(requested.iter().map(|xs| xs.to_owned()));
 
-    let winnowed = requested_set.difference(&SKYUI_KEYS);
-    let winnowed: HashSet<String> = winnowed.cloned().collect();
-    let missing = winnowed.difference(&provided_set);
+    let mut trfiles = moddir.translation_files()?;
+    let padding = trfiles.iter().fold(15, |acc, (lang, _trfile)| {
+        let max = usize::max(acc, lang.len());
+        max
+    });
 
-    let mut mvec: Vec<&String> = missing.collect();
-    mvec.sort();
+    let report_for = |language: &str, trfile: &mut Translation| -> Result<()> {
+        let provided = trfile.provided_translations()?;
+        let provided_set: HashSet<String> =
+            HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
 
-    let unused = provided_set.difference(&requested_set);
-    let mut uvec: Vec<&String> = unused.collect();
-    uvec.sort();
-    if mvec.is_empty() && uvec.is_empty() {
-        log::warn!("    No translation problems found. ✨");
-    }
-    if !mvec.is_empty() {
-        if mvec.len() == 1 {
-            log::warn!("    1 translation is {}!\n", "missing".bold().red());
-        } else {
-            log::warn!(
-                "    {} translations are {}!\n",
-                mvec.len(),
-                "missing".bold().red()
-            );
+        let winnowed = requested_set.difference(&SKYUI_KEYS);
+        let winnowed: HashSet<String> = winnowed.cloned().collect();
+        let missing = winnowed.difference(&provided_set);
+        let mut mvec: Vec<&String> = missing.collect();
+        mvec.sort();
+
+        let unused = provided_set.difference(&requested_set);
+        let mut uvec: Vec<&String> = unused.collect();
+        uvec.sort();
+
+        if mvec.is_empty() && uvec.is_empty() {
+            log::debug!("{:>padding$}: no problems found", language.bold().blue());
         }
-        print_in_grid(&mvec, log::Level::Info);
-    }
-    if !uvec.is_empty() {
-        if uvec.len() == 1 {
-            log::warn!("    1 translation is {}.\n", "unused".bold().yellow());
-        } else {
-            log::warn!(
-                "    {} translations are {}.\n",
-                uvec.len(),
-                "unused".bold().yellow()
-            );
+        if !mvec.is_empty() {
+            if mvec.len() == 1 {
+                log::warn!(
+                    "{:>padding$}: 1 translation is {}!\n",
+                    language.bold().blue(),
+                    "missing".bold().red()
+                );
+            } else {
+                log::warn!(
+                    "{:>padding$}: {} translations are {}!\n",
+                    language.bold().blue(),
+                    mvec.len(),
+                    "missing".bold().red()
+                );
+            }
+            print_in_grid(&mvec, log::Level::Info);
         }
-        print_in_grid(&uvec, log::Level::Debug);
+        if !uvec.is_empty() {
+            if uvec.len() == 1 {
+                log::warn!(
+                    "{:>padding$}: 1 translation is {}.\n",
+                    language.bold().blue(),
+                    "unused".bold().yellow()
+                );
+            } else {
+                log::warn!(
+                    "{:>padding$}: {} translations are {}.\n",
+                    language.bold().blue(),
+                    uvec.len(),
+                    "unused".bold().yellow()
+                );
+            }
+            print_in_grid(&uvec, log::Level::Debug);
+        }
+        Ok(())
+    };
+
+    if check_all {
+        for (language, mut trfile) in trfiles {
+            report_for(language.as_str(), &mut trfile)?;
+        }
+    } else {
+        let trfile = trfiles.get_mut(language).expect(
+            format!(
+                "Can't find a translation file for language {}",
+                language.bold().yellow()
+            )
+            .as_str(),
+        );
+        report_for(language, trfile)?;
     }
 
     Ok(())
@@ -178,10 +218,8 @@ fn update(args: &Args) -> Result<(), Report> {
         max
     });
 
-    for (language, mut trfile) in trfiles {
-        let provided = moddir
-            .provided_translations_for(language.as_str())
-            .context(format!("Finding all translations into {language}"))?;
+    for (_language, mut trfile) in trfiles {
+        let provided = trfile.provided_translations()?;
         let provided_set: HashSet<String> =
             HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
 
@@ -287,7 +325,7 @@ fn main() -> Result<(), Report> {
         .unwrap();
 
     let result = match args.cmd {
-        Command::Check { ref language } => check(&args, language),
+        Command::Check { ref opts } => check(&args, opts.all, opts.language.as_str()),
         Command::Update => update(&args),
         Command::Validate => validate_config(&args),
     };
