@@ -1,9 +1,33 @@
-//! Formatting convenienced, tucked to the side.
+//! Formatting conveniences, tucked to the side.
 
 use term_grid::{Cell, Direction, Filling, Grid, GridOptions};
 use terminal_size::*;
 
 use crate::{Args, Command};
+
+/// Make a gridded string from any array of things that can be stringified
+/// in the available terminal space.
+pub fn grid_string(items: &Vec<impl ToString>, space: u16) -> String {
+    let width = if let Some((Width(w), Height(_h))) = terminal_size() {
+        w - 2
+    } else {
+        72
+    };
+
+    let mut grid = Grid::new(GridOptions {
+        filling: Filling::Spaces(2),
+        direction: Direction::LeftToRight,
+    });
+    for item in items {
+        grid.add(Cell::from(item.to_string()));
+    }
+
+    if let Some(g) = grid.fit_into_width((width - space).into()) {
+        g.to_string()
+    } else {
+        grid.fit_into_columns(2).to_string()
+    }
+}
 
 impl std::fmt::Display for Args {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -36,29 +60,5 @@ impl std::fmt::Display for Command {
             Command::Update => write!(f, "update"),
             Command::Validate => write!(f, "validate"),
         }
-    }
-}
-
-/// Print any array of things that can be stringified in a grid
-/// in the available terminal space.
-pub fn print_in_grid(items: &Vec<impl ToString>, level: log::Level) {
-    let width = if let Some((Width(w), Height(_h))) = terminal_size() {
-        w - 2
-    } else {
-        72
-    };
-
-    let mut grid = Grid::new(GridOptions {
-        filling: Filling::Spaces(2),
-        direction: Direction::LeftToRight,
-    });
-    for item in items {
-        grid.add(Cell::from(item.to_string()));
-    }
-
-    if let Some(g) = grid.fit_into_width(width.into()) {
-        log::log!(level, "{}", g);
-    } else {
-        log::log!(level, "{}", grid.fit_into_columns(2));
     }
 }

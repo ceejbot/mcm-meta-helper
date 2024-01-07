@@ -1,8 +1,11 @@
 use clap::{Parser, Subcommand};
+use comfy_table::presets::NOTHING;
+use comfy_table::*;
 use eyre::{Context, Report, Result};
 use jsonschema::JSONSchema;
 use owo_colors::OwoColorize;
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
 use std::path::PathBuf;
@@ -72,60 +75,103 @@ fn check(args: &Args, check_all: bool, maybe_lang: Option<String>) -> Result<boo
 
     let mut trfiles = moddir.translation_files()?;
 
-    let report_for = |language: &str, trfile: &mut Translation| -> Result<bool> {
-        let provided = trfile.provided_translations()?;
-        let provided_set: HashSet<String> =
-            HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
+    let report_for =
+        |table: &mut Table, language: &str, trfile: &mut Translation| -> Result<bool> {
+            let provided = trfile.provided_translations()?;
+            let provided_set: HashSet<String> =
+                HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
 
-        let winnowed = requested_set.difference(&SKYUI_KEYS);
-        let winnowed: HashSet<String> = winnowed.cloned().collect();
-        let missing = winnowed.difference(&provided_set);
-        let mut mvec: Vec<&String> = missing.collect();
-        mvec.sort();
+            let winnowed = requested_set.difference(&SKYUI_KEYS);
+            let winnowed: HashSet<String> = winnowed.cloned().collect();
+            let missing = winnowed.difference(&provided_set);
+            let mut missing_tags: Vec<String> = missing.cloned().collect();
+            missing_tags.sort();
 
-        let unused = provided_set.difference(&requested_set);
-        let mut uvec: Vec<&String> = unused.collect();
-        uvec.sort();
+            let unused = provided_set.difference(&requested_set);
+            let mut unused_tags: Vec<String> = unused.cloned().collect();
+            unused_tags.sort();
 
-        if mvec.is_empty() && uvec.is_empty() {
-            log::debug!("{}: no problems found", language.bold().blue());
-            return Ok(true);
-        }
-        log::warn!("\n{} problems found:", language.bold().blue());
-
-        if !mvec.is_empty() {
-            if mvec.len() == 1 {
-                log::warn!("1 translation is {}!", "missing".bold().red());
-            } else {
-                log::warn!(
-                    "{} translations are {}!",
-                    mvec.len(),
-                    "missing".bold().red()
-                );
+            if missing_tags.is_empty() && unused_tags.is_empty() {
+                log::debug!("{}: no problems found", language.bold().blue());
+                return Ok(true);
             }
-            print_in_grid(&mvec, log::Level::Info);
-        }
-        if !uvec.is_empty() {
-            if uvec.len() == 1 {
-                log::warn!("1 translation is {}.", "unused".bold().yellow());
+
+            let count_cell = if missing_tags.len() == 1 {
+                Cell::new("1 missing translation found")
             } else {
-                log::warn!(
-                    "{} translations are {} in json files.\n(They might be used in code.)",
-                    uvec.len(),
-                    "unused".bold().yellow()
-                );
+                Cell::new(format!("{} missing translations found", missing_tags.len()))
+            };
+            table.add_row(vec![
+                Cell::new(language)
+                    .fg(Color::Blue)
+                    .add_attribute(Attribute::Bold),
+                count_cell,
+            ]);
+
+            if args.quiet {
+                return Ok(missing_tags.is_empty());
             }
-            print_in_grid(&uvec, log::Level::Debug);
-        }
-        log::warn!("");
-        // We do not fail tests if we have unused translations.
-        Ok(mvec.is_empty())
-    };
+
+            #[allow(clippy::comparison_chain)]
+            if missing_tags.len() == 1 {
+                table.add_row(vec![
+                    Cell::new("missing")
+                        .fg(Color::Red)
+                        .add_attribute(Attribute::Bold),
+                    Cell::new(missing_tags.first().cloned().unwrap_or_default()), // this is hilarious
+                ]);
+            } else if missing_tags.len() > 1 {
+                table.add_row(vec![
+                    Cell::new("missing")
+                        .fg(Color::Red)
+                        .add_attribute(Attribute::Bold),
+                    Cell::new(grid_string(&missing_tags, 20)),
+                ]);
+            }
+
+            // Clippy wanted me to write it this way, and I think I hate it.
+            match unused_tags.len().cmp(&1) {
+                Ordering::Less => {}
+                Ordering::Equal => {
+                    table.add_row(vec![
+                        Cell::new("unused")
+                            .fg(Color::Yellow)
+                            .add_attribute(Attribute::Bold),
+                        Cell::new(unused_tags.first().cloned().unwrap_or_default()), // this is still hilarious
+                    ]);
+                }
+                Ordering::Greater => {
+                    let report_cell = if args.verbose {
+                        let gridded = grid_string(&unused_tags, 20);
+                        Cell::new(gridded.trim()).set_delimiter('\n')
+                    } else {
+                        Cell::new(format!("{} translations", unused_tags.len()))
+                    };
+                    table.add_row(vec![
+                        Cell::new("unused")
+                            .fg(Color::Yellow)
+                            .add_attribute(Attribute::Bold),
+                        report_cell,
+                    ]);
+                }
+            }
+
+            // We do not fail tests if we have unused translations.
+            Ok(missing_tags.is_empty())
+        };
+
+    let mut table = Table::new();
+    table
+        .load_preset(NOTHING)
+        .set_content_arrangement(ContentArrangement::Dynamic);
 
     let mut checks_passed = true;
     if check_all {
         for (language, mut trfile) in trfiles {
-            checks_passed &= report_for(language.as_str(), &mut trfile)?;
+            checks_passed &= report_for(&mut table, language.as_str(), &mut trfile)?;
+            if !args.quiet {
+                table.add_row(vec![Cell::new("---"), Cell::new("")]);
+            }
         }
     } else if let Some(language) = maybe_lang {
         let trfile = trfiles.get_mut(language.as_str()).unwrap_or_else(|| {
@@ -134,8 +180,9 @@ fn check(args: &Args, check_all: bool, maybe_lang: Option<String>) -> Result<boo
                 language.bold().yellow()
             )
         });
-        checks_passed = report_for(language.as_str(), trfile)?;
+        checks_passed = report_for(&mut table, language.as_str(), trfile)?;
     }
+    log::warn!("{}", table);
 
     Ok(checks_passed)
 }

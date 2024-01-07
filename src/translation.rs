@@ -87,8 +87,8 @@ impl Translation {
             }
             let Some((key, value)) = line.split_once('\t') else {
                 if !line.starts_with('-') {
-                    log::debug!("Line with len={} does not contain a tab! Line:", line.len());
-                    log::debug!("{line}");
+                    log::trace!("Line with len={} does not contain a tab! Line:", line.len());
+                    log::trace!("{line}");
                 }
                 continue;
             };
