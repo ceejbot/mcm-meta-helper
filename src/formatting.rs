@@ -27,8 +27,10 @@ impl std::fmt::Display for Command {
             Command::Check { opts } => {
                 if opts.all {
                     write!(f, "check --all")
+                } else if let Some(lang) = &opts.language {
+                    write!(f, "check --language {lang}")
                 } else {
-                    write!(f, "check --language {}", opts.language)
+                    write!(f, "check")
                 }
             }
             Command::Update => write!(f, "update"),

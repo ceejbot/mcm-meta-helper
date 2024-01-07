@@ -55,13 +55,13 @@ pub enum Command {
 pub struct Langs {
     /// Check only translations for this one language.
     #[arg(long, short)]
-    language: String,
+    language: Option<String>,
     /// Check all languages
     #[arg(long)]
     all: bool,
 }
 
-fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
+fn check(args: &Args, check_all: bool, maybe_lang: Option<String>) -> Result<bool, Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
@@ -71,9 +71,6 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
         HashSet::from_iter(requested.iter().map(|xs| xs.to_owned()));
 
     let mut trfiles = moddir.translation_files()?;
-    let padding = trfiles
-        .iter()
-        .fold(15, |acc, (lang, _trfile)| usize::max(acc, lang.len()));
 
     let report_for = |language: &str, trfile: &mut Translation| -> Result<bool> {
         let provided = trfile.provided_translations()?;
@@ -91,20 +88,17 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
         uvec.sort();
 
         if mvec.is_empty() && uvec.is_empty() {
-            log::debug!("{:>padding$}: no problems found", language.bold().blue());
+            log::debug!("{}: no problems found", language.bold().blue());
             return Ok(true);
         }
+        log::warn!("\n{} problems found:", language.bold().blue());
+
         if !mvec.is_empty() {
             if mvec.len() == 1 {
-                log::warn!(
-                    "{:>padding$}: 1 translation is {}!\n",
-                    language.bold().blue(),
-                    "missing".bold().red()
-                );
+                log::warn!("1 translation is {}!", "missing".bold().red());
             } else {
                 log::warn!(
-                    "{:>padding$}: {} translations are {}!\n",
-                    language.bold().blue(),
+                    "{} translations are {}!",
                     mvec.len(),
                     "missing".bold().red()
                 );
@@ -113,21 +107,17 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
         }
         if !uvec.is_empty() {
             if uvec.len() == 1 {
-                log::warn!(
-                    "{:>padding$}: 1 translation is {}.\n",
-                    language.bold().blue(),
-                    "unused".bold().yellow()
-                );
+                log::warn!("1 translation is {}.", "unused".bold().yellow());
             } else {
                 log::warn!(
-                    "{:>padding$}: {} translations are {}.\n",
-                    language.bold().blue(),
+                    "{} translations are {} in json files.\n(They might be used in code.)",
                     uvec.len(),
                     "unused".bold().yellow()
                 );
             }
             print_in_grid(&uvec, log::Level::Debug);
         }
+        log::warn!("");
         // We do not fail tests if we have unused translations.
         Ok(mvec.is_empty())
     };
@@ -137,14 +127,14 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
         for (language, mut trfile) in trfiles {
             checks_passed &= report_for(language.as_str(), &mut trfile)?;
         }
-    } else {
-        let trfile = trfiles.get_mut(language).unwrap_or_else(|| {
+    } else if let Some(language) = maybe_lang {
+        let trfile = trfiles.get_mut(language.as_str()).unwrap_or_else(|| {
             panic!(
                 "Can't find a translation file for language {}",
                 language.bold().yellow()
             )
         });
-        checks_passed = report_for(language, trfile)?;
+        checks_passed = report_for(language.as_str(), trfile)?;
     }
 
     Ok(checks_passed)
@@ -273,7 +263,7 @@ fn main() -> Result<(), Report> {
         .unwrap();
 
     let result = match args.cmd {
-        Command::Check { ref opts } => check(&args, opts.all, opts.language.as_str()),
+        Command::Check { ref opts } => check(&args, opts.all, opts.language.clone()),
         Command::Update => update(&args),
         Command::Validate => validate_config(&args),
     };
