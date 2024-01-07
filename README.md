@@ -6,7 +6,11 @@ It will also look for any I4 json files in your mod and scan those for requested
 
 ## Usage
 
-The most common usage is to change your working directory to your mod directory, then run `mcm-meta-helper check`.
+The most common usage is to change your working directory to your mod directory, then run `mcm-meta-helper check`. The tool exits with a non-zero status if missing translations are found, so you can perhaps fail a test suite for your mod if you detect this.
+
+You can add translation stubs to any language file missing them by running `mcm-meta-helper update`.
+
+There are additional options for each command:
 
 ```text
 $ mcm-meta-helper help
@@ -40,4 +44,4 @@ This is a Rust language project. Install the Rust tools with [rustup](https://ru
 
 ## License
 
-[The Parity Public License.](https://paritylicense.com) This license requires people who build with this software to share their work with the community, too. In Skyrim modding language, this license allows "cathedral" modding, not "parlor" modding.
+[The Parity Public License.](https://paritylicense.com) This license requires people who build on top of this source code to share their work with the community, too. In Skyrim modding language, this license allows "cathedral" modding, not "parlor" modding. Please see the text of the license for details.

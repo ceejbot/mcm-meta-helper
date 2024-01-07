@@ -2,8 +2,6 @@ use clap::{Parser, Subcommand};
 use eyre::{Context, Report, Result};
 use jsonschema::JSONSchema;
 use owo_colors::OwoColorize;
-use term_grid::{Cell, Direction, Filling, Grid, GridOptions};
-use terminal_size::*;
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -15,6 +13,8 @@ mod translation;
 pub use translation::*;
 mod skyui_translations;
 pub use skyui_translations::*;
+mod formatting;
+pub use formatting::*;
 
 /// Help manage MCM Helper translation files by checking for missing or unused translations.
 ///
@@ -61,61 +61,7 @@ pub struct Langs {
     all: bool,
 }
 
-impl std::fmt::Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::Check { opts } => {
-                if opts.all {
-                    write!(f, "check --all")
-                } else {
-                    write!(f, "check --language {}", opts.language)
-                }
-            }
-            Command::Update => write!(f, "update"),
-            Command::Validate => write!(f, "validate"),
-        }
-    }
-}
-
-impl std::fmt::Display for Args {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "mcm-meta-helper ")?;
-        if self.verbose {
-            write!(f, "--verbose")?;
-        }
-        if self.quiet {
-            write!(f, "--quiet")?;
-        }
-        if self.moddir.as_str() != "." {
-            write!(f, "--moddir '{}'", self.moddir)?;
-        }
-        write!(f, " {}", self.cmd)
-    }
-}
-
-pub fn print_in_grid(items: &Vec<impl ToString>, level: log::Level) {
-    let width = if let Some((Width(w), Height(_h))) = terminal_size() {
-        w - 2
-    } else {
-        72
-    };
-
-    let mut grid = Grid::new(GridOptions {
-        filling: Filling::Spaces(2),
-        direction: Direction::LeftToRight,
-    });
-    for item in items {
-        grid.add(Cell::from(item.to_string()));
-    }
-
-    if let Some(g) = grid.fit_into_width(width.into()) {
-        log::log!(level, "{}", g);
-    } else {
-        log::log!(level, "{}", grid.fit_into_columns(2));
-    }
-}
-
-fn check(args: &Args, check_all: bool, language: &str) -> Result<(), Report> {
+fn check(args: &Args, check_all: bool, language: &str) -> Result<bool, Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
@@ -125,12 +71,11 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<(), Report> {
         HashSet::from_iter(requested.iter().map(|xs| xs.to_owned()));
 
     let mut trfiles = moddir.translation_files()?;
-    let padding = trfiles.iter().fold(15, |acc, (lang, _trfile)| {
-        let max = usize::max(acc, lang.len());
-        max
-    });
+    let padding = trfiles
+        .iter()
+        .fold(15, |acc, (lang, _trfile)| usize::max(acc, lang.len()));
 
-    let report_for = |language: &str, trfile: &mut Translation| -> Result<()> {
+    let report_for = |language: &str, trfile: &mut Translation| -> Result<bool> {
         let provided = trfile.provided_translations()?;
         let provided_set: HashSet<String> =
             HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
@@ -147,6 +92,7 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<(), Report> {
 
         if mvec.is_empty() && uvec.is_empty() {
             log::debug!("{:>padding$}: no problems found", language.bold().blue());
+            return Ok(true);
         }
         if !mvec.is_empty() {
             if mvec.len() == 1 {
@@ -182,28 +128,29 @@ fn check(args: &Args, check_all: bool, language: &str) -> Result<(), Report> {
             }
             print_in_grid(&uvec, log::Level::Debug);
         }
-        Ok(())
+        // We do not fail tests if we have unused translations.
+        Ok(mvec.is_empty())
     };
 
+    let mut checks_passed = true;
     if check_all {
         for (language, mut trfile) in trfiles {
-            report_for(language.as_str(), &mut trfile)?;
+            checks_passed &= report_for(language.as_str(), &mut trfile)?;
         }
     } else {
-        let trfile = trfiles.get_mut(language).expect(
-            format!(
+        let trfile = trfiles.get_mut(language).unwrap_or_else(|| {
+            panic!(
                 "Can't find a translation file for language {}",
                 language.bold().yellow()
             )
-            .as_str(),
-        );
-        report_for(language, trfile)?;
+        });
+        checks_passed = report_for(language, trfile)?;
     }
 
-    Ok(())
+    Ok(checks_passed)
 }
 
-fn update(args: &Args) -> Result<(), Report> {
+fn update(args: &Args) -> Result<bool, Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
@@ -246,10 +193,10 @@ fn update(args: &Args) -> Result<(), Report> {
         }
     }
 
-    Ok(())
+    Ok(true)
 }
 
-fn validate_config(args: &Args) -> Result<(), Report> {
+fn validate_config(args: &Args) -> Result<bool, Report> {
     // from moddir, read ./mcm/config/**/config.json
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
     let Some(fpath) = moddir.find_config()? else {
@@ -257,7 +204,7 @@ fn validate_config(args: &Args) -> Result<(), Report> {
             "No MCM Helper {} files found to check.",
             "config.json".blue()
         );
-        return Ok(());
+        return Ok(false);
     };
 
     // last two segments of the path...
@@ -285,19 +232,20 @@ fn validate_config(args: &Args) -> Result<(), Report> {
             "✅  {} is a valid MCM Helper file.",
             display_name.bold().blue(),
         );
-    } else {
-        log::warn!("⚠️  {} has errors!", display_name.bold().red());
+        return Ok(true);
+    }
 
-        let result = schema.validate(&config);
-        if let Err(errors) = result {
-            for error in errors {
-                log::warn!("{:?}: {}", error.kind, error);
-                log::warn!("Instance path: {}\n", error.instance_path);
-            }
+    log::warn!("⚠️  {} has errors!", display_name.bold().red());
+
+    let result = schema.validate(&config);
+    if let Err(errors) = result {
+        for error in errors {
+            log::warn!("{:?}: {}", error.kind, error);
+            log::warn!("Instance path: {}\n", error.instance_path);
         }
     }
 
-    Ok(())
+    Ok(false)
 }
 
 /// Process command-line options and act on them.
@@ -331,7 +279,13 @@ fn main() -> Result<(), Report> {
     };
 
     match result {
-        Ok(_) => Ok(()),
+        Ok(passed) => {
+            if passed {
+                Ok(())
+            } else {
+                Err(eyre::eyre!("The checks found problems!"))
+            }
+        }
         Err(e) => {
             log::error!("mcm-meta-helper couldn't run!");
             log::error!("{e:#}");
