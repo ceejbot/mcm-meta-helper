@@ -112,6 +112,13 @@ impl ModDirectory {
         self.name.as_str()
     }
 
+    pub fn languages(&mut self) -> Result<Vec<String>> {
+        let mapping = self.translation_files()?;
+        let mut result: Vec<String> = mapping.keys().cloned().collect();
+        result.sort();
+        Ok(result)
+    }
+
     pub fn provided_translations_for(&mut self, language: &str) -> Result<Vec<String>> {
         let lang = language.to_string().to_lowercase();
         let Some(mut trfile) = self.translation_file_for(lang.as_str())? else {

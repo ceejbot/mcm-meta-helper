@@ -670,7 +670,9 @@ dependencies = [
  "once_cell",
  "owo-colors",
  "serde_json",
+ "terminal_size",
  "ucs2",
+ "uutils_term_grid",
 ]
 
 [[package]]
@@ -1264,6 +1266,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unicode-width"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
+
+[[package]]
 name = "url"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1285,6 +1293,15 @@ name = "uuid"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
+
+[[package]]
+name = "uutils_term_grid"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b389452a568698688dda38802068378a16c15c4af9b153cdd99b65391292bbc7"
+dependencies = [
+ "unicode-width",
+]
 
 [[package]]
 name = "version_check"

@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use eyre::{Context, Report, Result};
 use jsonschema::JSONSchema;
 use owo_colors::OwoColorize;
+use term_grid::{Cell, Direction, Filling, Grid, GridOptions};
+use terminal_size::*;
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -77,6 +79,28 @@ impl std::fmt::Display for Args {
     }
 }
 
+pub fn print_in_grid(items: &Vec<impl ToString>, level: log::Level) {
+    let width = if let Some((Width(w), Height(_h))) = terminal_size() {
+        w - 2
+    } else {
+        72
+    };
+
+    let mut grid = Grid::new(GridOptions {
+        filling: Filling::Spaces(2),
+        direction: Direction::LeftToRight,
+    });
+    for item in items {
+        grid.add(Cell::from(item.to_string()));
+    }
+
+    if let Some(g) = grid.fit_into_width(width.into()) {
+        log::log!(level, "{}", g);
+    } else {
+        log::log!(level, "{}", grid.fit_into_columns(2));
+    }
+}
+
 fn check(args: &Args, language: &str) -> Result<(), Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
@@ -110,23 +134,77 @@ fn check(args: &Args, language: &str) -> Result<(), Report> {
     uvec.sort();
     if mvec.is_empty() && uvec.is_empty() {
         log::warn!("    No translation problems found. ✨");
-    } else if !mvec.is_empty() {
-        log::warn!(
-            "    {} translations are {}!",
-            mvec.len(),
-            "missing".bold().red()
-        );
-        for k in mvec {
-            log::info!("        {k}");
+    }
+    if !mvec.is_empty() {
+        if mvec.len() == 1 {
+            log::warn!("    1 translation is {}!\n", "missing".bold().red());
+        } else {
+            log::warn!(
+                "    {} translations are {}!\n",
+                mvec.len(),
+                "missing".bold().red()
+            );
         }
-    } else if !uvec.is_empty() {
-        log::warn!(
-            "    {} translations are {}.",
-            uvec.len(),
-            "unused".bold().yellow()
-        );
-        for k in uvec {
-            log::debug!("        {k}");
+        print_in_grid(&mvec, log::Level::Info);
+    }
+    if !uvec.is_empty() {
+        if uvec.len() == 1 {
+            log::warn!("    1 translation is {}.\n", "unused".bold().yellow());
+        } else {
+            log::warn!(
+                "    {} translations are {}.\n",
+                uvec.len(),
+                "unused".bold().yellow()
+            );
+        }
+        print_in_grid(&uvec, log::Level::Debug);
+    }
+
+    Ok(())
+}
+
+fn update(args: &Args) -> Result<(), Report> {
+    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
+
+    let requested = moddir
+        .all_needed_translations()
+        .context("Finding all requested translations")?;
+    let requested_set: HashSet<String> =
+        HashSet::from_iter(requested.iter().map(|xs| xs.to_owned()));
+
+    let trfiles = moddir.translation_files()?;
+    let padding = trfiles.iter().fold(30, |acc, (_lang, trfile)| {
+        let max = usize::max(acc, trfile.display().len());
+        max
+    });
+
+    for (language, mut trfile) in trfiles {
+        let provided = moddir
+            .provided_translations_for(language.as_str())
+            .context(format!("Finding all translations into {language}"))?;
+        let provided_set: HashSet<String> =
+            HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
+
+        let winnowed = requested_set.difference(&SKYUI_KEYS);
+        let winnowed: HashSet<String> = winnowed.cloned().collect();
+        let missing = winnowed.difference(&provided_set);
+
+        let mut mvec: Vec<&String> = missing.collect();
+        if mvec.is_empty() {
+            log::debug!("{:>padding$}: none needed", trfile.display().bold().blue());
+        } else {
+            mvec.sort();
+            trfile.add_stub_translation(mvec.as_slice())?;
+            let prefix = if mvec.len() == 1 {
+                "1 stub".to_string()
+            } else {
+                format!("{} stubs", mvec.len())
+            };
+            log::info!(
+                "{:>padding$}: {} added",
+                trfile.display().bold().blue(),
+                prefix
+            );
         }
     }
 
@@ -210,10 +288,7 @@ fn main() -> Result<(), Report> {
 
     let result = match args.cmd {
         Command::Check { ref language } => check(&args, language),
-        Command::Update => {
-            log::warn!("Unimplemented!");
-            Ok(())
-        }
+        Command::Update => update(&args),
         Command::Validate => validate_config(&args),
     };
 

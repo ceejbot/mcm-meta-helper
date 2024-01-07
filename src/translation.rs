@@ -3,9 +3,11 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, Read};
+use std::fs::OpenOptions;
+use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 
+use byte_slice_cast::AsByteSlice;
 use byte_slice_cast::AsMutSliceOf;
 use eyre::{Context, Report, Result};
 
@@ -93,5 +95,32 @@ impl Translation {
             translations.insert(key.trim().to_owned(), value.trim().to_owned());
         }
         Ok(translations)
+    }
+
+    pub fn add_stub_translation(&mut self, stubs: &[&String]) -> Result<()> {
+        let mut lines: Vec<String> = Vec::new();
+        lines.push("\n---------- new translation stubs ----------\n".to_string());
+        stubs.iter().for_each(|stub| {
+            lines.push(format!(
+                "{}\ttranslation for {}",
+                stub,
+                stub.replacen('$', "", 1)
+            ));
+        });
+
+        let input = lines.join("\n");
+        let mut widebuf: Vec<u16> = vec![0; input.len() * 2];
+        let count = match ucs2::encode(input.as_str(), &mut widebuf) {
+            Ok(v) => v,
+            Err(e) => return Err(Report::msg(format!("error while encoding strings: {e:?}"))),
+        };
+        widebuf.resize(count, 0);
+
+        let narrow = widebuf.as_byte_slice();
+        let mut options = OpenOptions::new();
+        let mut file = options.append(true).open(&self.fpath)?;
+        file.write_all(narrow)?;
+        file.flush()?;
+        Ok(())
     }
 }
