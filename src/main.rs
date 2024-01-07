@@ -43,28 +43,16 @@ pub struct Args {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Cross-check required translation strings versus the ones found in translation files.
-    Check {
-        #[command(flatten)]
-        opts: Langs,
-    },
+    Check { language: String },
     /// Update all translation files with missing translation strings and placeholders.
     Update,
     /// Validate the mcm config json file against the MCM helper schema
     Validate,
 }
 
-#[derive(Clone, Debug, clap::Args)]
-#[group(required = true, multiple = false)]
-pub struct Langs {
-    /// Check only translations for this one language.
-    #[arg(long, short)]
-    language: Option<String>,
-    /// Check all languages
-    #[arg(long)]
-    all: bool,
-}
+fn check(args: &Args, language: &String) -> Result<bool, Report> {
+    let check_all = *language == "all".to_string();
 
-fn check(args: &Args, check_all: bool, maybe_lang: Option<String>) -> Result<bool, Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
@@ -173,7 +161,7 @@ fn check(args: &Args, check_all: bool, maybe_lang: Option<String>) -> Result<boo
                 table.add_row(vec![Cell::new("---"), Cell::new("")]);
             }
         }
-    } else if let Some(language) = maybe_lang {
+    } else {
         let trfile = trfiles.get_mut(language.as_str()).unwrap_or_else(|| {
             panic!(
                 "Can't find a translation file for language {}",
@@ -310,7 +298,7 @@ fn main() -> Result<(), Report> {
         .unwrap();
 
     let result = match args.cmd {
-        Command::Check { ref opts } => check(&args, opts.all, opts.language.clone()),
+        Command::Check { ref language } => check(&args, language),
         Command::Update => update(&args),
         Command::Validate => validate_config(&args),
     };

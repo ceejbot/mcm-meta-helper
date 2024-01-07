@@ -48,13 +48,11 @@ impl std::fmt::Display for Args {
 impl std::fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::Check { opts } => {
-                if opts.all {
+            Command::Check { ref language } => {
+                if (*language).as_str() == "all" {
                     write!(f, "check --all")
-                } else if let Some(lang) = &opts.language {
-                    write!(f, "check --language {lang}")
                 } else {
-                    write!(f, "check")
+                    write!(f, "check --language {language}")
                 }
             }
             Command::Update => write!(f, "update"),

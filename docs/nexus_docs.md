@@ -6,13 +6,21 @@ I wrote it because I got tired of using some terrible `jq` and `sed` hacks to fi
 
 Install it from the archive here on the Nexus, or from the [releases on GitHub](https://github.com/ceejbot/mcm-meta-helper/releases/). Put it in your path somewhere and fire up a terminal with your favorite shell. Change directories to your mod, then run the tool to check. Here are the three checks it can run for you:
 
-`mcm-meta-helper check`: Reports on missing translations or translations that are provided but unused in the JSON files.
+`mcm-meta-helper check <language>`: Reports on missing translations or translations that are provided but unused in the JSON files.
 
-`mcm-meta-helper update`: Adds stubs for missing translations to all detected translation files with omissions.
+`mcm-meta-helper check all`: Check all languages found in the mod's `Interface/Translations/` directory for missing and unused translations.
+
+`mcm-meta-helper update`: Updates all translation files that are missing translations with stubs for the missing entries.
 
 `mcm-meta-helper validate`: Validates the mod's `config.json` file (in `mcm/config/MOD_NAME/config.json`) against the official MCM Helper schema. This often reports errors with valid and working config files, so you shouldn't use this to replace testing. The schema has possibly drifted a bit from the reality of the code.
 
-The tool has a number of options to make checking your mods easier. For instance, to check a mod that isn't the current directory, pass `--moddir /path/to/mod`. Run `mcm-meta-helper <command> --help` to get help for a specific command.
+The tool has some options to make checking your mods easier. For instance, to check a mod that isn't the current directory, pass `--moddir /path/to/mod`. Run `mcm-meta-helper <command> --help` to get help for a specific command. If a check fails, the tool exits with a non-zero status code.
+
+You can control the verbosity of the reporting output by using `--verbose` or `-v` to make it chattier, and `--quiet` to make it quieter.
+
+## Things the tool does not do
+
+It does not look for translation tags appearing in Papyrus source or in any other code. It only rummages through the json files looking for tags.
 
 ## Full help output
 
@@ -48,4 +56,4 @@ Options:
 
 ## Permissions and credits
 
-This is a Rust project. [Source is available on GitHub](https://github.com/ceejbot/mcm-meta-helper) under the [the Parity Public License](https://paritylicense.com). This license allows you to use and share this software for free, but you have to share software that builds on it alike. In Skyrim modding language, this mod requires "cathedral" modding, not "parlor" modding.
+This is a Rust project. [Source is available on GitHub](https://github.com/ceejbot/mcm-meta-helper) under the [the Parity Public License](https://paritylicense.com). This license allows you to use and share this software for free, but you have to share software that builds on it alike. In Skyrim modding language, this license supports "cathedral" modding, not "parlor" modding.
