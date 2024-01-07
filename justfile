@@ -34,9 +34,9 @@ tag VERSION:
     set -e
     tomato set package.version {{VERSION}} Cargo.toml
     cargo check
-    git commit Cargo.toml Cargo.lock -m "v{{VERSION}}"
-    git tag "v{{VERSION}}"
-    echo "Release tagged for version v{{VERSION}}"
+    git commit Cargo.toml Cargo.lock -m "{{VERSION}}"
+    git tag "{{VERSION}}"
+    echo "Release tagged for version {{VERSION}}"
 
 # Build a mod archive for the Nexus.
 [unix]

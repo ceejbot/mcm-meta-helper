@@ -7,6 +7,7 @@ authors = ["C J Silverio <ceejceej@gmail.com>"]
 license = "Parity-7.0.0"
 readme = "README.md"
 keywords = ["skyrim", "cli", "gaming"]
+repository = "https://github.com/ceejbot/mcm-meta-helper"
 
 [dependencies]
 byte-slice-cast = "1.2.2"
@@ -21,3 +22,25 @@ serde_json = "1.0.108"
 terminal_size = "0.3.0"
 ucs2 = "0.3.2"
 uutils_term_grid = "0.3.0"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.6.2"
+# The installers to generate for each app
+installers = ["powershell", "homebrew"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+# CI backends to support
+ci = ["github"]
+# A GitHub repo to push Homebrew formulas to
+tap = "ceejbot/homebrew-tap"
+# Publish jobs to run in CI
+publish-jobs = ["homebrew"]
+# Publish jobs to run in CI
+pr-run-mode = "plan"
