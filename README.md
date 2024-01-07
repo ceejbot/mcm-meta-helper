@@ -4,6 +4,13 @@
 
 It will also look for any I4 json files in your mod and scan those for requested translations.
 
+You can install the meta-helper by downloading a prebuilt executable from [the latest release](https://github.com/ceejbot/mcm-meta-helper/releases/latest), from its [NexusMods page](https://www.nexusmods.com/skyrimspecialedition/mods/108633). If you are a homebrew user:
+
+```sh
+brew tap ceejbot/tap
+brew install mcm-meta-helper
+```
+
 ## Usage
 
 The most common usage is to change your working directory to your mod directory, then run `mcm-meta-helper check`. The tool exits with a non-zero status if missing translations are found, so you can perhaps fail a test suite for your mod if you detect this.

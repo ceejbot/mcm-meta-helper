@@ -4,13 +4,13 @@ I wrote it because I got tired of using some terrible `jq` and `sed` hacks to fi
 
 ## How to use it
 
-Install it from the archive here on the Nexus, or from the [releases on GitHub](https://github.com/ceejbot/mcm-meta-helper/releases/). Put it in your path somewhere and fire up a terminal with your favorite shell. Change directories to your mod, then run the tool to check. Here are the three checks it can run for you:
+Install it from the archive here on the Nexus, or from the [releases on GitHub](https://github.com/ceejbot/mcm-meta-helper/releases/). The releases page has additional ways to install it, using homebrew or a powershell script. Put the executable in your path somewhere and fire up a terminal with your favorite shell. Change directories to your mod, then run the tool to check. Here are the three checks it can run for you:
 
-`mcm-meta-helper check <language>`: Reports on missing translations or translations that are provided but unused in the JSON files.
+`mcm-meta-helper check all`: Check all languages found in the mod's `Interface/Translations/` directory for missing translations and translations that are provided but unused in the JSON files.
 
-`mcm-meta-helper check all`: Check all languages found in the mod's `Interface/Translations/` directory for missing and unused translations.
+`mcm-meta-helper check <language>`: Run the checks for only the given language.
 
-`mcm-meta-helper update`: Updates all translation files that are missing translations with stubs for the missing entries.
+`mcm-meta-helper update`: Updates all translation files that are missing translations with stubs for the missing entries. These new entries are added at the end of the file.
 
 `mcm-meta-helper validate`: Validates the mod's `config.json` file (in `mcm/config/MOD_NAME/config.json`) against the official MCM Helper schema. This often reports errors with valid and working config files, so you shouldn't use this to replace testing. The schema has possibly drifted a bit from the reality of the code.
 
@@ -18,9 +18,9 @@ The tool has some options to make checking your mods easier. For instance, to ch
 
 You can control the verbosity of the reporting output by using `--verbose` or `-v` to make it chattier, and `--quiet` to make it quieter.
 
-## Things the tool does not do
+## Things the tool does not do (yet)
 
-It does not look for translation tags appearing in Papyrus source or in any other code. It only rummages through the json files looking for tags.
+It does not look for translation tags appearing in Papyrus source or in any other code. It only rummages through the json files looking for tags. If you look up translations in code for on-screen messages, those translations might be reported as unused.
 
 ## Full help output
 
