@@ -63,4 +63,4 @@ archive:
 
 # Check soulsyhud
 soulsy:
-	cargo run -- --moddir ../soulsy/installer/core check --language english -v
+	cargo run -- --moddir ../soulsy/installer/core check english -v
