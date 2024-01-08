@@ -65,13 +65,24 @@ impl Translation {
             return Ok(HashMap::new());
         }
 
-        let widebytes = bytes.as_mut_slice_of::<u16>()?;
+        let widebytes = bytes.as_mut_slice_of::<u16>().context(format!(
+            "decoding the {} translation file: {}",
+            self.language, self.display_name
+        ))?;
         let mut utf8bytes: Vec<u8> = vec![0; count];
         let _widecount = match ucs2::decode(widebytes, &mut utf8bytes) {
             Ok(c) => c,
             Err(e) => {
                 log::error!("{e:?}");
-                return Err(eyre::eyre!("error decoding UCS-2 characters into utf-8"));
+                return match e {
+                    ucs2::Error::BufferOverflow => Err(eyre::eyre!(
+                        "Not enough space left in the output buffer to decode UCS-2 characters;\n{} might not be a valid UCS-2 file.",
+                        self.display()
+                    )),
+                    ucs2::Error::MultiByte => Err(eyre::eyre!(
+                        "Input contained a character which cannot be represented in UCS-2;\n{} might not be a valid UCS-2 file.",
+                     self.display())),
+                };
             }
         };
 

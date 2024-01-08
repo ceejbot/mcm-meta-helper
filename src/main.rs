@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
+use color_eyre::eyre::Result;
 use comfy_table::presets::NOTHING;
 use comfy_table::*;
-use eyre::{Context, Report, Result};
+use eyre::{Context, Report};
 use jsonschema::JSONSchema;
 use owo_colors::OwoColorize;
 
@@ -51,7 +52,7 @@ pub enum Command {
 }
 
 fn check(args: &Args, language: &String) -> Result<bool, Report> {
-    let check_all = *language == "all".to_string();
+    let check_all = *language == "all";
 
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
@@ -62,10 +63,22 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
         HashSet::from_iter(requested.iter().map(|xs| xs.to_owned()));
 
     let mut trfiles = moddir.translation_files()?;
+    let mut errors_caught: Vec<Report> = Vec::new();
 
-    let report_for =
+    let mut report_for =
         |table: &mut Table, language: &str, trfile: &mut Translation| -> Result<bool> {
-            let provided = trfile.provided_translations()?;
+            let provided = match trfile.provided_translations() {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "There was a serious problem reading the translation file {}",
+                        trfile.display().red().bold()
+                    );
+                    log::error!("{e}");
+                    errors_caught.push(e);
+                    return Ok(false);
+                }
+            };
             let provided_set: HashSet<String> =
                 HashSet::from_iter(provided.iter().map(|xs| xs.to_owned()));
 
@@ -172,7 +185,11 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
     }
     log::warn!("{}", table);
 
-    Ok(checks_passed)
+    if !errors_caught.is_empty() {
+        Err(errors_caught.pop().unwrap())
+    } else {
+        Ok(checks_passed)
+    }
 }
 
 fn update(args: &Args) -> Result<bool, Report> {
@@ -275,6 +292,7 @@ fn validate_config(args: &Args) -> Result<bool, Report> {
 
 /// Process command-line options and act on them.
 fn main() -> Result<(), Report> {
+    color_eyre::install()?;
     let args = Args::parse();
     let level = if args.verbose {
         // Debug-level logging should be designed for modders to read when they
@@ -308,11 +326,11 @@ fn main() -> Result<(), Report> {
             if passed {
                 Ok(())
             } else {
-                Err(eyre::eyre!("The checks found problems!"))
+                Err(eyre::eyre!("The checks found problems you need to fix."))
             }
         }
         Err(e) => {
-            log::error!("mcm-meta-helper couldn't run!");
+            log::error!("mcm-meta-helper encountered a serious problem:");
             log::error!("{e:#}");
             log::error!("The command run was:\n{}", args.bold());
             Err(e)

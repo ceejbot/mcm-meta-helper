@@ -12,6 +12,7 @@ repository = "https://github.com/ceejbot/mcm-meta-helper"
 [dependencies]
 byte-slice-cast = "1.2.2"
 clap = { version = "4.4.11", features = ["derive", "wrap_help"] }
+color-eyre = "0.6.2"
 comfy-table = "7.1.0"
 eyre = "0.6.10"
 jsonschema = "0.17.1"
