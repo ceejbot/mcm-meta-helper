@@ -110,7 +110,7 @@ impl Translation {
 
     pub fn add_stub_translation(&mut self, stubs: &[&String]) -> Result<()> {
         let mut lines: Vec<String> = Vec::new();
-        lines.push("\n---------- new translation stubs ----------\n".to_string());
+        lines.push("\r\n---------- new translation stubs ----------\r\n".to_string());
         stubs.iter().for_each(|stub| {
             lines.push(format!(
                 "{}\ttranslation for {}",
@@ -118,8 +118,9 @@ impl Translation {
                 stub.replacen('$', "", 1)
             ));
         });
+        lines.push("".to_string());
 
-        let input = lines.join("\n");
+        let input = lines.join("\r\n");
         let mut widebuf: Vec<u16> = vec![0; input.len() * 2];
         let count = match ucs2::encode(input.as_str(), &mut widebuf) {
             Ok(v) => v,
