@@ -48,7 +48,7 @@ impl std::fmt::Display for Args {
 impl std::fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::Check { ref language } => {
+            Command::Check { ref language, .. } => {
                 if (*language).as_str() == "all" {
                     write!(f, "check --all")
                 } else {

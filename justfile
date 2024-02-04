@@ -61,10 +61,10 @@ archive:
 @archive:
 	write-host "You need to run this in WSL to get bash."
 
-# Check soulsyhud
+# Check soulsyhud's english language translations
 soulsy:
-	cargo run -- --moddir ../soulsy/installer/core check english -v
+	cargo run -- --moddir ../soulsy/installer/core --sourcedir ../soulsy/src --sourcedir ../soulsy/installer/core/scripts/source check english -v
 
 # Check soulsyhud
 soulsy-all:
-	cargo run -- --moddir ../soulsy/installer/core check all -v
+	cargo run -- --moddir ../soulsy/installer/core --sourcedir ../soulsy/src check all -v

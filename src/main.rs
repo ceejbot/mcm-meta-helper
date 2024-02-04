@@ -30,6 +30,9 @@ pub struct Args {
     /// The mod directory containing the mod to analyze.
     #[clap(long, short, global = true, default_value = ".")]
     moddir: String,
+    /// Any additional source directory to search for translations use.
+    #[clap(long, short, global = true, default_value = ".")]
+    sourcedir: Vec<String>,
     /// Print out more information as the tool runs.
     #[clap(long, short, global = true)]
     verbose: bool,
@@ -44,7 +47,10 @@ pub struct Args {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Cross-check required translation strings versus the ones found in translation files.
-    Check { language: String },
+    Check {
+        /// Limit the check to a single language file.
+        language: String,
+    },
     /// Update all translation files with missing translation strings and placeholders.
     Update,
     /// Validate the mcm config json file against the MCM helper schema
@@ -54,7 +60,7 @@ pub enum Command {
 fn check(args: &Args, language: &String) -> Result<bool, Report> {
     let check_all = *language == "all";
 
-    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str(), args.sourcedir.clone())?;
 
     let requested = moddir
         .all_needed_translations()
@@ -89,7 +95,8 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
             missing_tags.sort();
 
             let unused = provided_set.difference(&requested_set);
-            let mut unused_tags: Vec<String> = unused.cloned().collect();
+            let unused_tags: Vec<String> = unused.cloned().collect();
+            let mut unused_tags = moddir.ripgrep_search(unused_tags);
             unused_tags.sort();
 
             if missing_tags.is_empty() && unused_tags.is_empty() {
@@ -193,7 +200,7 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
 }
 
 fn update(args: &Args) -> Result<bool, Report> {
-    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str(), args.sourcedir.clone())?;
 
     let requested = moddir
         .all_needed_translations()
@@ -240,7 +247,7 @@ fn update(args: &Args) -> Result<bool, Report> {
 
 fn validate_config(args: &Args) -> Result<bool, Report> {
     // from moddir, read ./mcm/config/**/config.json
-    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str(), Vec::new())?;
     let Some(fpath) = moddir.find_config()? else {
         log::info!(
             "No MCM Helper {} files found to check.",

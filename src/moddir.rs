@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::path::PathBuf;
+use std::process::Command;
 
 use crate::Translation;
 
@@ -18,10 +19,12 @@ pub struct ModDirectory {
     name: String,
     /// Hashmap of language => filename, because modname is not predictable
     translations: Option<HashMap<String, Translation>>,
+    rg_found: Option<String>,
+    sourcedir: Vec<String>,
 }
 
 impl ModDirectory {
-    pub fn new(directory: &str) -> Result<Self> {
+    pub fn new(directory: &str, sourcedir: Vec<String>) -> Result<Self> {
         let modpath = PathBuf::from(directory).canonicalize()?;
         let components = modpath.components();
         let lastbits: PathBuf = components.clone().rev().take(1).collect();
@@ -32,6 +35,8 @@ impl ModDirectory {
             modpath,
             name,
             translations: None,
+            sourcedir,
+            rg_found: None,
         })
     }
 
@@ -106,6 +111,58 @@ impl ModDirectory {
 
         requested.sort();
         Ok(requested)
+    }
+
+    /// Search for the potentially unused tags in a source directory, skipping jsons.
+    /// If ripgrep isn't present (as either rg or rg.exe) this doesn't filter but
+    /// also does not trigger errors.
+    pub fn ripgrep_search(&mut self, lookfor: Vec<String>) -> Vec<String> {
+        if self.sourcedir.is_empty() {
+            return lookfor;
+        }
+
+        // Test for ripgrep first.
+        let cmdstr = if let Some(maybe) = &self.rg_found {
+            maybe.as_str()
+        } else {
+            let found = if let Ok(_) = Command::new("rg").arg("--version").output() {
+                "rg"
+            } else if let Ok(_) = Command::new("rg.exe").arg("--version").output() {
+                "rg.exe"
+            } else {
+                ""
+            };
+            self.rg_found = Some(found.to_string());
+            found
+        };
+        if cmdstr.is_empty() {
+            return lookfor;
+        }
+
+        lookfor
+            .iter()
+            .filter(|xs| {
+                let escaped = xs.replace('$', "\\$");
+                let mut cmd = Command::new(cmdstr);
+                cmd.arg(escaped);
+                if !self.sourcedir.is_empty() {
+                    cmd.args(&self.sourcedir);
+                } else {
+                    cmd.arg(self.modpath.to_string_lossy().to_string());
+                };
+
+                let Ok(subproc) = cmd.spawn() else {
+                    return true;
+                };
+                let Ok(output) = subproc.wait_with_output() else {
+                    return true;
+                };
+                let status = output.status;
+                // rg exits with non-zero status code if the search fails
+                !status.success()
+            })
+            .cloned()
+            .collect()
     }
 
     pub fn name(&self) -> &str {
