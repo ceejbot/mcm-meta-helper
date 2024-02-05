@@ -144,20 +144,16 @@ impl ModDirectory {
             .filter(|xs| {
                 let escaped = xs.replace('$', "\\$");
                 let mut cmd = Command::new(cmdstr);
+                cmd.arg("--quiet");
                 cmd.arg(escaped);
                 if !self.sourcedir.is_empty() {
                     cmd.args(&self.sourcedir);
                 } else {
                     cmd.arg(self.modpath.to_string_lossy().to_string());
                 };
-
-                let Ok(subproc) = cmd.spawn() else {
+                let Ok(status) = cmd.status() else {
                     return true;
                 };
-                let Ok(output) = subproc.wait_with_output() else {
-                    return true;
-                };
-                let status = output.status;
                 // rg exits with non-zero status code if the search fails
                 !status.success()
             })
