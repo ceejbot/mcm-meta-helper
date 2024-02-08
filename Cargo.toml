@@ -24,6 +24,7 @@ serde_json = "1.0.108"
 terminal_size = "0.3.0"
 ucs2 = "0.3.2"
 uutils_term_grid = "0.3.0"
+walkdir = "2.4.0"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

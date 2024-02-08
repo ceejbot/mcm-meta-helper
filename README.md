@@ -17,32 +17,48 @@ The most common usage is to change your working directory to your mod directory,
 
 You can add translation stubs to any language file missing them by running `mcm-meta-helper update`.
 
-There are additional options for each command:
+There are additional options for each command. Here is the full output of help:
 
 ```text
 $ mcm-meta-helper help
-Help manage MCM Helper translation files by checking for missing or unused translations.
+Help manage MCM Helper translation files by checking for missing or
+unused translations.
 
-Can also compare your config.json file against the MCM Helper schema to report problems, though this is unreliable at the moment because the schema is not quite right.
+Can also compare your config.json file against the MCM Helper schema to
+report problems, though this is unreliable at the moment because the schema
+is not quite right.
 
 Usage: mcm-meta-helper [OPTIONS] <COMMAND>
 
 Commands:
-  check     Cross-check required translation strings versus the ones found
-            in translation files.
-  update    Update all mod translation files with missing translation strings
-            and placeholders.
+  check     Cross-check required translation strings versus the ones found in
+            translation files
+  update    Update all translation files with missing translation strings and
+            placeholders
   validate  Validate the mcm config json file against the MCM helper schema
   help      Print this message or the help of the given subcommand(s)
 
 Options:
   -m, --moddir <MODDIR>
           The mod directory containing the mod to analyze
+
           [default: .]
-  -v, --verbose Print out more information as the tool runs
-  -q, --quiet Print out only very important information
-  -h, --help Print help (see a summary with '-h')
-  -V, --version Print version
+
+  -s, --sourcedir <SOURCEDIR>
+          Any additional source directory to search for translations in use.
+          Repeat for as many directories as you want to search
+
+  -v, --verbose
+          Print out more information as the tool runs
+
+  -q, --quiet
+          Print out only very important information
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
 ```
 
 ## Hacking

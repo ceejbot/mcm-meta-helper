@@ -63,8 +63,8 @@ archive:
 
 # Check soulsyhud's english language translations
 soulsy:
-	cargo run -- --moddir ../soulsy/installer/core --sourcedir ../soulsy/src --sourcedir ../soulsy/installer/core/scripts/source check english -v
+	cargo run -- --moddir ../soulsy check english -v
 
 # Check soulsyhud
 soulsy-all:
-	cargo run -- --moddir ../soulsy/installer/core --sourcedir ../soulsy/src check all -v
+	cargo run -- --moddir ../soulsy check all -v

@@ -1,5 +1,7 @@
 use eyre::{Report, Result};
+use once_cell::sync::Lazy;
 use serde_json::Value;
+use walkdir::WalkDir;
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -8,6 +10,16 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crate::Translation;
+
+pub static RIPGREP: Lazy<String> = Lazy::new(|| {
+    if let Ok(_) = Command::new("rg").arg("--version").output() {
+        "rg".to_string()
+    } else if let Ok(_) = Command::new("rg.exe").arg("--version").output() {
+        "rg.exe".to_string()
+    } else {
+        "".to_string()
+    }
+});
 
 #[derive(Debug, Clone)]
 pub struct ModDirectory {
@@ -19,30 +31,34 @@ pub struct ModDirectory {
     name: String,
     /// Hashmap of language => filename, because modname is not predictable
     translations: Option<HashMap<String, Translation>>,
-    rg_found: Option<String>,
-    sourcedir: Vec<String>,
+    /// The discovered data directory for this mod tree.
+    datadir: PathBuf,
 }
 
 impl ModDirectory {
-    pub fn new(directory: &str, sourcedir: Vec<String>) -> Result<Self> {
+    pub fn new(directory: &str) -> Result<Self> {
         let modpath = PathBuf::from(directory).canonicalize()?;
         let components = modpath.components();
         let lastbits: PathBuf = components.clone().rev().take(1).collect();
         let name = lastbits.display().to_string();
+
+        let datadir = find_data_dir(&modpath).expect(&format!(
+            "{} does not contain a valid MCM Helper-using mod.",
+            modpath.display()
+        ));
 
         Ok(Self {
             config_path: None,
             modpath,
             name,
             translations: None,
-            sourcedir,
-            rg_found: None,
+            datadir,
         })
     }
 
     pub fn translation_files(&mut self) -> Result<HashMap<String, Translation>> {
         let search_dir: PathBuf = [
-            self.modpath.clone(),
+            self.datadir.clone(),
             PathBuf::from("Interface"),
             PathBuf::from("Translations"),
         ]
@@ -117,25 +133,8 @@ impl ModDirectory {
     /// If ripgrep isn't present (as either rg or rg.exe) this doesn't filter but
     /// also does not trigger errors.
     pub fn ripgrep_search(&mut self, lookfor: Vec<String>) -> Vec<String> {
-        if self.sourcedir.is_empty() {
-            return lookfor;
-        }
-
         // Test for ripgrep first.
-        let cmdstr = if let Some(maybe) = &self.rg_found {
-            maybe.as_str()
-        } else {
-            let found = if let Ok(_) = Command::new("rg").arg("--version").output() {
-                "rg"
-            } else if let Ok(_) = Command::new("rg.exe").arg("--version").output() {
-                "rg.exe"
-            } else {
-                ""
-            };
-            self.rg_found = Some(found.to_string());
-            found
-        };
-        if cmdstr.is_empty() {
+        if RIPGREP.is_empty() {
             return lookfor;
         }
 
@@ -143,14 +142,13 @@ impl ModDirectory {
             .iter()
             .filter(|xs| {
                 let escaped = xs.replace('$', "\\$");
-                let mut cmd = Command::new(cmdstr);
-                cmd.arg("--quiet");
+                let mut cmd = Command::new(RIPGREP.as_str());
+                cmd.arg("--quiet")
+                    .arg("-Tjson")
+                    .arg("--glob")
+                    .arg("!Translations");
                 cmd.arg(escaped);
-                if !self.sourcedir.is_empty() {
-                    cmd.args(&self.sourcedir);
-                } else {
-                    cmd.arg(self.modpath.to_string_lossy().to_string());
-                };
+                cmd.arg(self.modpath.to_string_lossy().to_string());
                 let Ok(status) = cmd.status() else {
                     return true;
                 };
@@ -191,7 +189,7 @@ impl ModDirectory {
 
     pub fn find_config(&mut self) -> Result<Option<PathBuf>, Report> {
         let search_dir: PathBuf = [
-            self.modpath.as_os_str(),
+            self.datadir.as_os_str(),
             OsStr::new("mcm"),
             OsStr::new("config"),
         ]
@@ -236,7 +234,7 @@ impl ModDirectory {
     /// Find all inventory injector files for this mod.
     pub fn find_i4_jsons(&mut self) -> Result<Vec<PathBuf>, Report> {
         let search_dir: PathBuf = [
-            self.modpath.as_os_str(),
+            self.datadir.as_os_str(),
             OsStr::new("SKSE"),
             OsStr::new("plugins"),
             OsStr::new("InventoryInjector"),
@@ -316,4 +314,69 @@ fn keys_from_array(arr: &[Value]) -> Vec<String> {
         .flatten()
         .cloned()
         .collect::<Vec<String>>()
+}
+
+/// Directories to skip.
+const IGNORE_DIRS: [&str; 3] = ["target", "build", "extern"];
+
+/// Filter a list of immediate subdirectories of a given directory for only
+/// directories relevant for considering as potential data dirs.
+fn find_relevant_dirs(path: &PathBuf) -> Vec<PathBuf> {
+    WalkDir::new(path)
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let basename = e
+                .path()
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            if basename.starts_with(".") {
+                None
+            } else if IGNORE_DIRS.contains(&basename.as_str()) {
+                None
+            } else {
+                Some(e.path().to_path_buf())
+            }
+        })
+        .collect()
+}
+
+/// Look for the two required mcm-helper subdirs in a list of subdirectories,
+/// returning true if they're found.
+fn is_data_dir(dirs: &[PathBuf]) -> bool {
+    if dirs.iter().any(|e| {
+        e.file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_lowercase()
+            == "interface"
+    }) {
+        true
+    } else {
+        false
+    }
+}
+
+/// Find a subdirectory of moddir that has both "interface" and "translations"
+/// as subdirectories (names case-insensitive). This is our starting point for
+/// finding config.json. If we don't find one, this mod directory is not valid
+/// for us, because we need mcm config and translation files to do our work.
+fn find_data_dir(top: &PathBuf) -> Option<PathBuf> {
+    let relevant = find_relevant_dirs(top);
+    if is_data_dir(relevant.as_slice()) {
+        Some(top.clone())
+    } else {
+        for entry in relevant {
+            if let Some(found) = find_data_dir(&entry) {
+                return Some(found);
+            }
+        }
+        None
+    }
 }

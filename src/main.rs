@@ -30,9 +30,6 @@ pub struct Args {
     /// The mod directory containing the mod to analyze.
     #[clap(long, short, global = true, default_value = ".")]
     moddir: String,
-    /// Any additional source directory to search for translations use.
-    #[clap(long, short, global = true, default_value = ".")]
-    sourcedir: Vec<String>,
     /// Print out more information as the tool runs.
     #[clap(long, short, global = true)]
     verbose: bool,
@@ -60,7 +57,7 @@ pub enum Command {
 fn check(args: &Args, language: &String) -> Result<bool, Report> {
     let check_all = *language == "all";
 
-    let mut moddir = ModDirectory::new(args.moddir.as_str(), args.sourcedir.clone())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
         .all_needed_translations()
@@ -200,7 +197,7 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
 }
 
 fn update(args: &Args) -> Result<bool, Report> {
-    let mut moddir = ModDirectory::new(args.moddir.as_str(), args.sourcedir.clone())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
     let requested = moddir
         .all_needed_translations()
@@ -247,7 +244,7 @@ fn update(args: &Args) -> Result<bool, Report> {
 
 fn validate_config(args: &Args) -> Result<bool, Report> {
     // from moddir, read ./mcm/config/**/config.json
-    let mut moddir = ModDirectory::new(args.moddir.as_str(), Vec::new())?;
+    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
     let Some(fpath) = moddir.find_config()? else {
         log::info!(
             "No MCM Helper {} files found to check.",
