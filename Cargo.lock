@@ -720,7 +720,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-meta-helper"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "byte-slice-cast",
  "clap",
