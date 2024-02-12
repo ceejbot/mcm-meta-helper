@@ -21,12 +21,10 @@ There are additional options for each command. Here is the full output of help:
 
 ```text
 $ mcm-meta-helper help
-Help manage MCM Helper translation files by checking for missing or
-unused translations.
+Help manage MCM Helper translation files by checking for missing or unused translations.
 
-Can also compare your config.json file against the MCM Helper schema to
-report problems, though this is unreliable at the moment because the schema
-is not quite right.
+Can also compare your config.json file against the MCM Helper schema to report problems,
+though this is unreliable at the moment because the schema is not quite right.
 
 Usage: mcm-meta-helper [OPTIONS] <COMMAND>
 
@@ -43,12 +41,7 @@ Commands:
 Options:
   -m, --moddir <MODDIR>
           The mod directory containing the mod to analyze
-
           [default: .]
-
-  -s, --sourcedir <SOURCEDIR>
-          Any additional source directory to search for translations in use.
-          Repeat for as many directories as you want to search
 
   -v, --verbose
           Print out more information as the tool runs

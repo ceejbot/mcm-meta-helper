@@ -12,19 +12,29 @@ Install it from the archive here on the Nexus, or from the [releases on GitHub](
 
 `mcm-meta-helper update`: Updates all translation files that are missing translations with stubs for the missing entries. These new entries are added at the end of the file.
 
+`mcm-meta-helper copy <language>`: Copy into all other language files translations that the given language has that they're missing. This command lets you add new translations in a single language, then add them to the end of the other language files. Existing translations aren't touched.
+
 `mcm-meta-helper validate`: Validates the mod's `config.json` file (in `mcm/config/MOD_NAME/config.json`) against the official MCM Helper schema. This often reports errors with valid and working config files, so you shouldn't use this to replace testing. The schema has possibly drifted a bit from the reality of the code.
 
 The tool has some options to make checking your mods easier. For instance, to check a mod that isn't the current directory, pass `--moddir /path/to/mod`. Run `mcm-meta-helper <command> --help` to get help for a specific command. If a check fails, the tool exits with a non-zero status code.
 
 You can control the verbosity of the reporting output by using `--verbose` or `-v` to make it chattier, and `--quiet` to make it quieter.
 
+## Full source search available
+
+If the tool finds [ripgrep](https://github.com/BurntSushi/ripgrep?tab=readme-ov-file#ripgrep-rg) available on your path, as either `rg` or `rg.exe`, it will do a full text search of all files in the mod directory for translation usage. Ripgrep is aware of `.gitingore` files. In this tool's usage, it skips json files as well as build output directories.
+
+This feature brought the false-positive unused translation reports for my mods down to a single truly-unused translation, which I could then clean up.
+
 ## Things the tool does not do (yet)
 
-It does not look for translation tags appearing in Papyrus source or in any other code. It only rummages through the json files looking for tags. If you look up translations in code for on-screen messages, those translations might be reported as unused.
+It could fall back from `rg` to similar tools like `ack` and `ag`. It could also be more restrictive about what files it searches. If you experience regular false positives, let me know.
 
 ## Full help output
 
 ```text
+$ mcm-meta-helper help
+$ mcm-meta-helper help
 Help manage MCM Helper translation files by checking for missing or unused translations.
 
 Can also compare your config.json file against the MCM Helper schema to report problems,
@@ -35,6 +45,8 @@ Usage: mcm-meta-helper [OPTIONS] <COMMAND>
 Commands:
   check     Cross-check required translation strings versus the ones found in
             translation files
+  copy      Copy translations from the source language file to any language file
+            missing translations
   update    Update all translation files with missing translation strings and
             placeholders
   validate  Validate the mcm config json file against the MCM helper schema
@@ -44,12 +56,16 @@ Options:
   -m, --moddir <MODDIR>
           The mod directory containing the mod to analyze
           [default: .]
+
   -v, --verbose
           Print out more information as the tool runs
+
   -q, --quiet
           Print out only very important information
+
   -h, --help
           Print help (see a summary with '-h')
+
   -V, --version
           Print version
 ```
