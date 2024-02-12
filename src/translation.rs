@@ -11,12 +11,13 @@ use byte_slice_cast::AsByteSlice;
 use byte_slice_cast::AsMutSliceOf;
 use eyre::{Context, Report, Result};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Translation {
     fpath: PathBuf,
     display_name: String,
     language: String,
     translations: Option<HashMap<String, String>>,
+    lines: Vec<(String, String)>,
 }
 
 impl Translation {
@@ -33,6 +34,7 @@ impl Translation {
             display_name,
             language,
             translations: None,
+            lines: Vec::new(),
         }
     }
 
@@ -40,18 +42,28 @@ impl Translation {
         self.display_name.as_str()
     }
 
-    pub fn provided_translations(&mut self) -> Result<Vec<String>> {
-        let map = self.load_translations()?;
-        let mut result: Vec<String> = map.keys().cloned().collect();
-        result.sort();
-        Ok(result)
+    pub fn lines(&self) -> &Vec<(String, String)> {
+        &self.lines
     }
 
-    pub fn load_translations(&mut self) -> Result<HashMap<String, String>, Report> {
-        if self.translations.is_some() {
-            return Ok(self.translations.as_ref().unwrap().clone());
+    pub fn provided_translations(&mut self) -> Result<Vec<String>> {
+        let map = self.translations()?;
+        Ok(map.keys().cloned().collect())
+    }
+
+    pub fn translations(&mut self) -> Result<HashMap<String, String>, Report> {
+        if self.translations.is_none() {
+            self.load_translations()?;
         }
 
+        Ok(self.translations.clone().unwrap_or_default())
+    }
+
+    pub fn set_translations(&mut self, map: HashMap<String, String>) {
+        self.translations = Some(map);
+    }
+
+    pub fn load_translations(&mut self) -> Result<(), Report> {
         let mut file = File::open(&self.fpath).context(format!(
             "opening the {} translation file: {}",
             self.language, self.display_name
@@ -62,7 +74,8 @@ impl Translation {
             self.language, self.display_name
         ))?;
         if count == 0 {
-            return Ok(HashMap::new());
+            self.set_translations(HashMap::new());
+            return Ok(());
         }
 
         let widebytes = bytes.as_mut_slice_of::<u16>().context(format!(
@@ -87,6 +100,7 @@ impl Translation {
         };
 
         let reader = std::io::BufReader::new(utf8bytes.as_slice()).lines();
+        let mut lines: Vec<(String, String)> = Vec::new();
         let mut translations: HashMap<String, String> = HashMap::new();
         for maybe_line in reader {
             let Ok(line) = maybe_line else {
@@ -94,18 +108,31 @@ impl Translation {
             };
             let line = line.trim().trim_matches('\0');
             if line.len() < 4 {
+                lines.push((line.to_string(), String::new()));
                 continue;
             }
             let Some((key, value)) = line.split_once('\t') else {
-                if !line.starts_with('-') {
-                    log::trace!("Line with len={} does not contain a tab! Line:", line.len());
-                    log::trace!("{line}");
-                }
+                lines.push((line.to_string(), String::new()));
                 continue;
             };
             translations.insert(key.trim().to_owned(), value.trim().to_owned());
+            lines.push((key.to_string(), value.to_string()));
         }
-        Ok(translations)
+        self.lines = lines;
+        self.set_translations(translations.clone());
+        Ok(())
+    }
+
+    pub fn insert_at(&mut self, key: String, value: String, idx: usize) {
+        if idx >= self.lines.len() {
+            self.lines.push((key, value));
+        } else {
+            self.lines.insert(idx, (key, value));
+        }
+    }
+
+    pub fn append_translation(&mut self, key: String, value: String) {
+        self.lines.push((key, value));
     }
 
     pub fn add_stub_translation(&mut self, stubs: &[&String]) -> Result<()> {
@@ -121,6 +148,34 @@ impl Translation {
         lines.push("".to_string());
 
         let input = lines.join("\r\n");
+        let mut widebuf: Vec<u16> = vec![0; input.len() * 2];
+        let count = match ucs2::encode(input.as_str(), &mut widebuf) {
+            Ok(v) => v,
+            Err(e) => return Err(Report::msg(format!("error while encoding strings: {e:?}"))),
+        };
+        widebuf.resize(count, 0);
+
+        let narrow = widebuf.as_byte_slice();
+        let mut options = OpenOptions::new();
+        let mut file = options.append(true).open(&self.fpath)?;
+        file.write_all(narrow)?;
+        file.flush()?;
+        Ok(())
+    }
+
+    pub fn write(&self) -> Result<()> {
+        let input = self
+            .lines
+            .iter()
+            .map(|(k, v)| {
+                if v.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("{k}\t{v}")
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("\r\n");
         let mut widebuf: Vec<u16> = vec![0; input.len() * 2];
         let count = match ucs2::encode(input.as_str(), &mut widebuf) {
             Ok(v) => v,

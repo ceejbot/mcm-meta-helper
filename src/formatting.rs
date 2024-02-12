@@ -55,6 +55,7 @@ impl std::fmt::Display for Command {
                     write!(f, "check --language {language}")
                 }
             }
+            Command::Copy { ref language } => write!(f, "copy {language}"),
             Command::Update => write!(f, "update"),
             Command::Validate => write!(f, "validate"),
         }

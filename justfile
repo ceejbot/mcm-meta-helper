@@ -65,6 +65,10 @@ archive:
 soulsy:
 	cargo run -- --moddir ../soulsy check english -v
 
+# Copy from soulsyhud's english language translations
+soulsy-copy:
+	cargo run -- --moddir ../soulsy copy english -v
+
 # Check soulsyhud
 soulsy-all:
 	cargo run -- --moddir ../soulsy check all -v

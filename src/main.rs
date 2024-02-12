@@ -48,6 +48,11 @@ pub enum Command {
         /// Limit the check to a single language file.
         language: String,
     },
+    /// Copy translations from the source language file to any language file missing translations.
+    Copy {
+        /// The language to use as a source. E.g., `english`, `japanese`.
+        language: String,
+    },
     /// Update all translation files with missing translation strings and placeholders.
     Update,
     /// Validate the mcm config json file against the MCM helper schema
@@ -196,6 +201,56 @@ fn check(args: &Args, language: &String) -> Result<bool, Report> {
     }
 }
 
+fn copy(args: &Args, language: &String) -> Result<bool, Report> {
+    let mut moddir = ModDirectory::new(args.moddir.as_str())?;
+    let trfiles = moddir.translation_files()?;
+    let mut source = moddir
+        .translation_file_for(language)?
+        .expect("Translations file for {language} does not exist!");
+    source.load_translations()?;
+    let source_translations = source.translations()?;
+    let source_has: HashSet<String> =
+        HashSet::from_iter(source_translations.iter().map(|(k, _v)| k.to_owned()));
+
+    for (target_lang, mut target) in trfiles {
+        if target_lang == *language {
+            continue;
+        }
+
+        let target_trs = target.translations()?;
+        let target_has: HashSet<String> =
+            HashSet::from_iter(target_trs.iter().map(|(k, _v)| k.to_owned()));
+
+        let mut count = 0;
+
+        for missing in source_has.difference(&target_has) {
+            log::debug!("   {missing} copied");
+            target.append_translation(
+                missing.clone(),
+                source_translations
+                    .get(missing)
+                    .cloned()
+                    .unwrap_or_default(),
+            );
+            count += 1;
+        }
+        if count > 0 {
+            if count == 1 {
+                log::info!("One missing translation copied to {}", target_lang.blue(),);
+            } else {
+                log::info!(
+                    "{} missing translations copied to {}",
+                    count.bold(),
+                    target_lang.blue(),
+                );
+            }
+            target.write()?;
+        }
+    }
+
+    Ok(true)
+}
+
 fn update(args: &Args) -> Result<bool, Report> {
     let mut moddir = ModDirectory::new(args.moddir.as_str())?;
 
@@ -321,6 +376,7 @@ fn main() -> Result<(), Report> {
 
     let result = match args.cmd {
         Command::Check { ref language } => check(&args, language),
+        Command::Copy { ref language } => copy(&args, language),
         Command::Update => update(&args),
         Command::Validate => validate_config(&args),
     };

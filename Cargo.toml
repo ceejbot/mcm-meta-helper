@@ -11,7 +11,7 @@ repository = "https://github.com/ceejbot/mcm-meta-helper"
 
 [dependencies]
 byte-slice-cast = "1.2.2"
-clap = { version = "4.4.11", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.0", features = ["derive", "wrap_help"] }
 color-eyre = "0.6.2"
 comfy-table = "7.1.0"
 eyre = "0.6.10"
@@ -19,8 +19,8 @@ jsonschema = "0.17.1"
 log = "0.4.20"
 loggerv = "0.7.2"
 once_cell = "1.19.0"
-owo-colors = "3.5.0"
-serde_json = "1.0.108"
+owo-colors = "4"
+serde_json = "1.0.113"
 terminal_size = "0.3.0"
 ucs2 = "0.3.2"
 uutils_term_grid = "0.3.0"
@@ -38,7 +38,11 @@ cargo-dist-version = "0.6.2"
 # The installers to generate for each app
 installers = ["powershell", "homebrew"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
 # CI backends to support
 ci = ["github"]
 # A GitHub repo to push Homebrew formulas to

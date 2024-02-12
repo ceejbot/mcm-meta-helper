@@ -33,6 +33,8 @@ Usage: mcm-meta-helper [OPTIONS] <COMMAND>
 Commands:
   check     Cross-check required translation strings versus the ones found in
             translation files
+  copy      Copy translations from the source language file to any language file
+            missing translations
   update    Update all translation files with missing translation strings and
             placeholders
   validate  Validate the mcm config json file against the MCM helper schema
