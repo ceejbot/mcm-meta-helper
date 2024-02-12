@@ -212,6 +212,11 @@ fn copy(args: &Args, language: &String) -> Result<bool, Report> {
     let source_has: HashSet<String> =
         HashSet::from_iter(source_translations.iter().map(|(k, _v)| k.to_owned()));
 
+    log::info!(
+        "\nCopying {} translation strings to other languages:",
+        language.bold().blue()
+    );
+
     for (target_lang, mut target) in trfiles {
         if target_lang == *language {
             continue;
@@ -222,9 +227,9 @@ fn copy(args: &Args, language: &String) -> Result<bool, Report> {
             HashSet::from_iter(target_trs.iter().map(|(k, _v)| k.to_owned()));
 
         let mut count = 0;
-
+        log::info!("{}...", target_lang.blue());
         for missing in source_has.difference(&target_has) {
-            log::debug!("   {missing} copied");
+            log::debug!("    + {missing}");
             target.append_translation(
                 missing.clone(),
                 source_translations
@@ -236,15 +241,13 @@ fn copy(args: &Args, language: &String) -> Result<bool, Report> {
         }
         if count > 0 {
             if count == 1 {
-                log::info!("One missing translation copied to {}", target_lang.blue(),);
+                log::info!("    {} missing translation copied.", "One".bold());
             } else {
-                log::info!(
-                    "{} missing translations copied to {}",
-                    count.bold(),
-                    target_lang.blue(),
-                );
+                log::info!("    {} missing translations copied.", count.bold());
             }
             target.write()?;
+        } else {
+            log::info!("    All translations found.");
         }
     }
 
